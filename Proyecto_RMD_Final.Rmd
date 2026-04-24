@@ -1,14 +1,61 @@
 ---
 title: 'Proyecto: Modelo de TFGb'
-author: "Miguel Rodriguez"
-date: "2026-04-24"
-output: html_document
+author: "MIGUEL ANGEL RODRIGUEZ FEREGRINO, 8vo Semestre, MICROBIOLOGIA"
+date: "23 de abril del 2026"
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    number_sections: true
+    df_print: paged
+  pdf_document:
+    toc: true
+    number_sections: true
+    fig_caption: true
+  word_document:
+    toc: true
+    number_sections: true
+fontsize: 11pt
+geometry: margin=2.5cm
+editor_options:
+  chunk_output_type: console
+  markdown: 
+    wrap: 72
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+source("Scripts/Grind.R")
+library(deSolve)
 ```
 
-Vamos a trabajar con la Red de regulación producto del ligando TGF-beta (TGFb), esta red es vital durante la carcinogenesis ya que dependiendo del tipo de estimulo la respuesta peude variar, cumpliendo con un papel dual: promoción de malignidades o control del ciclo celular, entre otras muchas funciones supresoras de tumores. Por tanto la primer aproximación tiene esta forma:
+Vamos a trabajar con la Red de regulación producto del ligando TGF-beta
+(TGFb), esta red es vital durante la carcinogenesis ya que dependiendo
+del tipo de estimulo la respuesta peude variar, cumpliendo con un papel
+dual: promoción de malignidades o control del ciclo celular, entre otras
+muchas funciones supresoras de tumores. Por tanto la primer aproximación
+tiene esta forma:
 
-![Red inicial propuesta]()
+![Red inicial propuesta](Imagenes/Diagrama%20en%20blanco.png)
+
+Sin embargo esta red es demasiado compleja como para analizar de forma
+optima por lo que vamos a reducirla: - Hay redundancia de señales, por
+lo que se pueden agrupar. - Algunas variables pueden cambiar a imputs
+del sistema, ya que no interactuan directamente con las demas. - Lo mas
+importante es conservar el ciclo de retroalimentacion negativa. -
+Nuestro objetivo es observar la activacion de forma prolongada de la
+via, ademas de la inactivacion rapida de la misma, cosa que nos llevaria
+a los dos fenotipos que queremos, por lo que el analisis de
+bifurcaciones es indispensable (por tanto trabajaremos con 2 variables)
+
+![Segunda propuesta de red de
+interaccion](Imagenes/Diagrama%20en%202.png) Las reacciones son:
+
+Reacción 1: Reacción 2: Reacción 3: Reacción 4:
+
+Un modelo seria:
+
+$$    \left\{\begin{array}{l}
+    \dot{SMAD_{act}}=\alpha \cdot TGFb \cdot \frac{(SMAD_{act})^n}{BAMBI^n + (SMAD_{act})^n}-SMAD_{act}(\beta + \mu_1 \cdot SMAD7)  \\
+    \dot{SMAD7}=\gamma \cdot SMAD_{act} -SMAD7 (\mu_2 \cdot SnoN  + \delta)\\
+    \end{array}\right.$$
