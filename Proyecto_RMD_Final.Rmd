@@ -1,0 +1,14 @@
+---
+title: 'Proyecto: Modelo de TFGb'
+author: "Miguel Rodriguez"
+date: "2026-04-24"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Vamos a trabajar con la Red de regulación producto del ligando TGF-beta (TGFb), esta red es vital durante la carcinogenesis ya que dependiendo del tipo de estimulo la respuesta peude variar, cumpliendo con un papel dual: promoción de malignidades o control del ciclo celular, entre otras muchas funciones supresoras de tumores. Por tanto la primer aproximación tiene esta forma:
+
+![Red inicial propuesta]()
