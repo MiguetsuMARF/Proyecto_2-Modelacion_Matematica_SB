@@ -26,6 +26,7 @@ editor_options:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
 source("Scripts/Grind.R")
+library(phaseR)
 library(deSolve)
 ```
 
@@ -51,11 +52,266 @@ bifurcaciones es indispensable (por tanto trabajaremos con 2 variables)
 ![Segunda propuesta de red de
 interaccion](Imagenes/Diagrama%20en%202.png) Las reacciones son:
 
-Reacción 1: Reacción 2: Reacción 3: Reacción 4:
+- Reacción 1: Produccion y activacion de SMADactivo, mediado a su vez
+  por la interaccion con TGFbeta y limitado por BAMBI, se representa con
+  reaccion de HILL ya que puede ser una interaccion de varios
+  componentes.
+- Reacción 2: degradacion e inactivacion de SMADactivo, mediado por beta
+  como indice basal y SMAD7 que contribuye segun una tasa mu1 a su
+  inactivacion.
+- Reacción 3: Activacion de SMAD7 que depende totalmente de SMADactivo
+- Reacción 4: Degradacion e inactivacion de SMAD7, depende de una tasa
+  delta basal y de SnoN segun una tasa mu2.
 
 Un modelo seria:
 
 $$    \left\{\begin{array}{l}
-    \dot{SMAD_{act}}=\alpha \cdot TGFb \cdot \frac{(SMAD_{act})^n}{BAMBI^n + (SMAD_{act})^n}-SMAD_{act}(\beta + \mu_1 \cdot SMAD7)  \\
+    \dot{SMAD_{act}}=\alpha + TGFb \cdot \frac{(SMAD_{act})^n}{BAMBI^n + (SMAD_{act})^n}-SMAD_{act}(\beta + \mu_1 \cdot SMAD7)  \\
     \dot{SMAD7}=\gamma \cdot SMAD_{act} -SMAD7 (\mu_2 \cdot SnoN  + \delta)\\
     \end{array}\right.$$
+
+Realizando una simulacion inicial se observa:
+
+```{r}
+par(mfrow = c(1,1))
+model <- function(t, state, parms){  
+  with(as.list(c(state,parms)), {
+    dx = alfa+TGFb*(x^n/(BAMBI^n + x^n))- x*(beta + (mu1*y))
+    dy = gamma*x - y*((mu2*SnoN) + delta)
+    return(list(c(dx, dy)))
+  })
+}
+p <-  c(alfa = 3, TGFb = 10, BAMBI = 0.2, 
+        beta = 1, mu1 = 0.5, n = 6, gamma = 1, mu2 = 0.4, SnoN = 1, delta = 1) 
+
+s <- c(x=0,y=0)
+
+run(tmax = 10, tstep = 0.01, state = s, parms = p, odes = model)
+```
+
+Que el sistema tiende a un equilibrio de ambas moleculas, lo cual tiene
+sentido en el caso de las estimulaciones constantes ya que a pesar de
+que hay retroaliemtacion negativa por y (SMAD7) sigue activa la via por
+lo que si hay arresto celular.
+
+Ahora bien, si vemos las ceroclinas del sistema con estos parametros:
+
+```{r}
+plane(xmax=10, ymax = 10)
+mid <- newton(s,plot=T)
+```
+
+Se observa un unico punto de equilibrio.
+
+Realizando un analisis de bifurcaciones se obtiene que los parametros \$
+\beta \$ y \$ BAMBI \$ son parametros de bifurcacion de la siguiente
+forma:
+
+```{r}
+mid <- newton(s,plot=F)
+low <- newton(c(x=10,y=0),plot=F)
+hig <- newton(c(x=0,y=20),plot=F)
+
+# Parametro beta
+continue(state=low, parms = p, odes=model, x="beta", step=0.001, 
+         xmin=0,xmax=50,y="y", ymin=0, ymax=4)
+continue(state=mid,parms = p,odes=model, x="beta",  step=0.001, 
+         xmin=0, xmax=50,y="y", ymin=0, ymax=4, add = TRUE)
+continue(state=hig, parms = p, odes=model, x="beta", step=0.001, 
+         xmin=0, xmax=50,y="y", ymin=0, ymax=4, add = TRUE)
+
+continue(state=low, parms = p, odes=model, x="beta", step=0.001, 
+         xmin=0,xmax=50,y="x", ymin=0, ymax=5)
+continue(state=mid,parms = p,odes=model, x="beta",  step=0.001, 
+         xmin=0, xmax=50,y="x", ymin=0, ymax=5, add = TRUE)
+continue(state=hig, parms = p, odes=model, x="beta", step=0.001, 
+         xmin=0, xmax=50,y="x", ymin=0, ymax=5, add = TRUE)
+
+```
+
+Con los parametros aqui propuestos, cuando BAMBI tiene un valor entre 28
+y 44 tenemos biestabilidad, que se observa:
+
+```{r}
+p[4] <-  35
+par(mfrow = c(1,1))
+plane(xmax=0.5, ymax = 20)
+mid <- newton(s,plot=T)
+low <- newton(c(x=0.2,y=1),plot=T)
+hig <- newton(c(x=0.5,y=4),plot=T)
+
+
+## 3 puntos de equilibrio 
+
+
+
+ini_1 <- c(x=0,y=0)
+ini_2 <- c(x=0.5,y=4)
+
+par(mfrow = c(3,2))
+for (i in 1:3) {
+  a <- c(5,0.5,0.5)
+  b<- c(0.1, 35, 50)
+  beta2 <- b[i]
+  out1 <- ode(y = ini_1, times = seq(from = 0, to = 10, by = 0.01), func = model, parms = p)
+  
+  plot(out1[,1], out1[,2],type = "l", ylim=c(0,a[i]),
+       col="red", xlab = "Time", ylab = "X(t)", 
+       main = paste("beta=", toString(beta2), sep=" "))
+  
+  out2 <- ode(y = ini_2, times = seq(from = 0, to = 10, by = 0.01), func = model, parms = p)
+  lines(out2[,1], out2[,2],type = "l", col="blue")
+  legend=c(paste("I.C.=", toString(ini_1), sep=" "), paste("I.C.=", toString(ini_2), sep=" "))
+  
+  poli.flowField <- flowField(
+    model, xlim = c(0, a[i]), ylim = c(0, 10), 
+    parameters = p, points = 20, add = FALSE)
+  poli.trajectory <- trajectory(
+    model, y0 = ini_1, tlim = c(0,20), 
+    parameters = p, col = "blue")
+  poli.trajectory <- trajectory(
+    model, y0 = ini_2, tlim = c(0,20), 
+    parameters = p, col = "red")
+}
+
+## asi se observan las soluciones del sistema en los 3 dominios del parametro 
+
+
+par(mfrow = c(1,3))
+for (i in 1:3) {
+  a <- c(10,0.5,0.5)
+  b<- c(0.1, 35, 50)
+  beta2 <- b[i]
+  p[4] <-  beta2
+  flowField(model, xlim = c(0, a[i]), ylim = c(0, 10), parameters = p, points = 20, add = FALSE)
+  s <- c(x=0,y=0)
+  mid <- newton(s,plot=T)
+  low <- newton(c(x=0.2,y=1),plot=T)
+  hig <- newton(c(x=0.5,y=4),plot=T)
+  
+  for (ii in seq(1,20,1) ){
+    r1=runif(1); r2=runif(1); r3=runif(1);
+    
+    if (r1<0.5){
+      ini = c(as.numeric(r2<0.5) + rnorm(1,sample(1:7)), r3 + rnorm(1,sample(1:7)))
+    } else {
+      ini = c(r3, as.numeric(r2<0.5) + 0.1^r1)
+    }
+    
+    trajectory(model, y0 = ini, tlim = c(0,20), parameters = p, col = "blue")
+  }
+}
+
+par(mfrow = c(1,1))
+p[4] <-  1
+
+## Asi se observan los espacios vectoriales de los tres dominios
+```
+
+```{r}
+mid <- newton(s,plot=F)
+low <- newton(c(x=10,y=0),plot=F)
+hig <- newton(c(x=0,y=20),plot=F)
+
+# parametro BAMBI
+continue(state=low, parms = p, odes=model, x="BAMBI", step=0.001, 
+         xmin=0,xmax=10,y="y", ymin=0, ymax=6)
+continue(state=mid,parms = p,odes=model, x="BAMBI",  step=0.001, 
+         xmin=0, xmax=10,y="y", ymin=0, ymax=6, add = TRUE)
+continue(state=hig, parms = p, odes=model, x="BAMBI", step=0.001, 
+         xmin=0, xmax=10,y="y", ymin=0, ymax=6, add = TRUE)
+
+continue(state=low, parms = p, odes=model, x="BAMBI", step=0.001, 
+         xmin=0,xmax=10,y="x", ymin=0, ymax=6)
+continue(state=mid,parms = p,odes=model, x="BAMBI",  step=0.001, 
+         xmin=0, xmax=10,y="x", ymin=0, ymax=6, add = TRUE)
+continue(state=hig, parms = p, odes=model, x="BAMBI", step=0.001, 
+         xmin=0, xmax=10,y="x", ymin=0, ymax=6, add = TRUE)
+
+```
+
+Con los parametros aqui propuestos, cuando BAMBI tiene un valor entre
+3.2 y 3.6 tenemos biestabilidad, que se observa:
+
+```{r}
+p[3] <- 3.3
+par(mfrow = c(1,1))
+plane(xmax=10, ymax = 4)
+mid <- newton(s,plot=T)
+low <- newton(c(x=2,y=1),plot=T)
+hig <- newton(c(x=5,y=4),plot=T)
+
+## 3 puntos de equilibrio 
+
+
+ini_1 <- c(x=2,y=1)
+ini_2 <- c(x=5,y=4)
+
+par(mfrow = c(3,2))
+for (BAMBI2 in c(0.1, 3.3, 10)) { 
+  p[3] <-  BAMBI2
+  out1 <- ode(y = ini_1, times = seq(from = 0, to = 10, by = 0.01), func = model, parms = p)
+  
+  plot(out1[,1], out1[,2],type = "l", ylim=c(0,5),
+       col="red", xlab = "Time", ylab = "X(t)", 
+       main = paste("BAMBI=", toString(BAMBI2), sep=" "))
+  
+  out2 <- ode(y = ini_2, times = seq(from = 0, to = 10, by = 0.01), func = model, parms = p)
+  lines(out2[,1], out2[,2],type = "l", col="blue")
+  legend=c(paste("I.C.=", toString(ini_1), sep=" "), paste("I.C.=", toString(ini_2), sep=" "))
+  
+  poli.flowField <- flowField(
+    model, xlim = c(0, 10), ylim = c(0, 10), 
+    parameters = p, points = 20, add = FALSE)
+  poli.trajectory <- trajectory(
+    model, y0 = ini_1, tlim = c(0,20), 
+    parameters = p, col = "blue")
+  poli.trajectory <- trajectory(
+    model, y0 = ini_2, tlim = c(0,20), 
+    parameters = p, col = "red")
+}
+
+## asi se observan las soluciones del sistema en los 3 dominios del parametro 
+
+
+par(mfrow = c(1,3))
+for (BAMBI2 in c(0.1, 3.3, 10)){
+  p[3] <-  BAMBI2
+  flowField(model, xlim = c(0, 10), ylim = c(0, 10), parameters = p, points = 20, add = FALSE)
+  s <- c(x=0,y=0)
+  mid <- newton(s,plot=T)
+  low <- newton(c(x=2,y=1),plot=T)
+  hig <- newton(c(x=5,y=4),plot=T)
+  
+  for (ii in seq(1,20,1) ){
+    r1=runif(1); r2=runif(1); r3=runif(1);
+    
+    if (r1<0.5){
+      ini = c(as.numeric(r2<0.5) + rnorm(1,sample(1:7)), r3 + rnorm(1,sample(1:7)))
+    } else {
+      ini = c(r3, as.numeric(r2<0.5) + 0.1^r1)
+    }
+    
+    trajectory(model, y0 = ini, tlim = c(0,20), parameters = p, col = "blue")
+  }
+}
+
+par(mfrow = c(1,1))
+p[3] <-  0.2
+
+## Asi se observan los espacios vectoriales de los tres dominios
+```
+
+En conclusion, tiene sentido que BAMBI sea un parametro de bifurcacion,
+ya que este domina la capacidad de TFGb de estimular la activacion, por
+lo que en celulas cancerigenas este puede tener hiperactividad y
+suprimir la via, llevando a que aun ante estimulos constantes de TFGb se
+interrumpa la señal de activacion. Por otro lado el parametro beta
+representa la degradacion/inactivacion basal de las SMAD, por lo que si
+tenemos una mutacion que lleve a alta degradacion de igual forma podemos
+tener una inactivacion temprana de la via.
+
+A este modelo le hace falta introducir justo la dependencia de TFGb de
+la activacion de su propia via, como se veria si este fuera dinamico en
+el tiempo y ademas incluir que BAMBI tambien es producto de la
+activacion de la via, no esta activo siempre.
